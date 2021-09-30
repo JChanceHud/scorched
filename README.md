@@ -1,8 +1,10 @@
-# Scathed Earth
+# Scorched
 
 A 2 of 2 scorched earth implementation.
 
 ## Features
+
+This implementation focuses on reducing the number of L1 transactions needed. Suggester/Asker state channels should be long lived with support for renegotiating rates, accepting/refusing queries and depositing/withdrawing funds.
 
 ### Query refusal
 
