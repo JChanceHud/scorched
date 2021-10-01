@@ -30,6 +30,7 @@ module.exports = {
     hardhat: {
       // Needed when the optimizer is disabled
       allowUnlimitedContractSize: true,
+      chainId: 0x1234,
     }
   }
 }

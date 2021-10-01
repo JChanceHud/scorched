@@ -1,18 +1,246 @@
 const { ethers } = require('hardhat')
+const { BigNumber } = require('ethers')
 const assert = require('assert')
+const {
+  getChannelId,
+  getFixedPart,
+  getVariablePart,
+  signStates,
+  convertAddressToBytes32
+} = require('@statechannels/nitro-protocol')
+
+const { AddressZero } = ethers.constants
+const { defaultAbiCoder } = ethers.utils
+
+const AppStatus = {
+  Answer: 0,
+  Validate: 1,
+}
+
+const QueryStatus = {
+  None: 0,
+  Accepted: 1,
+  Declined: 2,
+}
+
+const ResponseStatus = {
+  None: 0,
+  Pay: 1,
+  Burn: 2,
+}
+
+function encodeAppData(data) {
+  return ethers.utils.defaultAbiCoder.encode(
+    [
+      'tuple(uint256 payment, uint256 suggesterBurn, uint256 askerBurn, uint8 status, uint8 queryStatus, uint8 responseStatus)',
+    ],
+    [data]
+  )
+}
+
+function createOutcome(contracts, wallets, balances) {
+  const { assetHolder } = contracts
+  const { asker, suggester, beneficiary } = wallets
+  const weiBalances = {
+    [convertAddressToBytes32(asker.address)]: ethers.utils.parseEther(balances.asker.toString()),
+    [convertAddressToBytes32(suggester.address)]: ethers.utils.parseEther(balances.suggester.toString()),
+    [convertAddressToBytes32(beneficiary.address)]: ethers.utils.parseEther(balances.beneficiary.toString()),
+  }
+  const allocation = []
+  for (const key of Object.keys(weiBalances)) {
+    allocation.push({ destination: key, amount: weiBalances[key] })
+  }
+  return [
+    {
+      asset: '0x0000000000000000000000000000000000000000',
+      assetHolderAddress: assetHolder.address,
+      allocationItems: allocation
+    }
+  ]
+}
+
+async function getDeployedContracts() {
+  const Scorched = await ethers.getContractFactory('Scorched')
+  const scorched = await Scorched.deploy()
+  await scorched.deployed()
+
+  const NitroAdjudicator = await ethers.getContractFactory('NitroAdjudicator')
+  const adjudicator = await NitroAdjudicator.deploy()
+  await adjudicator.deployed()
+
+  const AssetHolder = await ethers.getContractFactory('MultiAssetHolder')
+  const assetHolder = await AssetHolder.deploy()
+  await assetHolder.deployed(adjudicator.address)
+  return { scorched, assetHolder, adjudicator }
+}
 
 describe('Scorched', function () {
-  it('Should deploy contracts', async () => {
-    const Scorched = await ethers.getContractFactory('Scorched')
-    const scorched = await Scorched.deploy()
-    await scorched.deployed()
+  it('should query and respond', async () => {
+    const { scorched, adjudicator, assetHolder } = await getDeployedContracts()
+    const [ sender, asker, suggester, beneficiary ] = await ethers.getSigners()
 
-    const NitroAdjudicator = await ethers.getContractFactory('NitroAdjudicator')
-    const adjudicator = await NitroAdjudicator.deploy()
-    await adjudicator.deployed()
+    const wallets = [
+      ethers.Wallet.createRandom(),
+      ethers.Wallet.createRandom(),
+    ]
 
-    const AssetHolder = await ethers.getContractFactory('MultiAssetHolder')
-    const assetHolder = await AssetHolder.deploy()
-    await assetHolder.deployed(adjudicator.address)
+    const channel = {
+      chainId: '0x1234',
+      channelNonce: BigNumber.from(0).toHexString(),
+      participants: wallets.map(w => w.address),
+    }
+    const channelId = getChannelId(channel)
+    const startingOutcome = createOutcome(
+      { assetHolder },
+      { asker, suggester, beneficiary, },
+      {
+        asker: 10,
+        suggester: 10,
+        beneficiary: 0,
+      }
+    )
+
+    const baseState = {
+      isFinal: false,
+      channel,
+      outcome: startingOutcome,
+      appDefinition: scorched.address,
+      appData: ethers.constants.HashZero,
+      challengeDuration: 1,
+    }
+
+    const state0 = {
+      ...baseState,
+      turnNum: 0,
+    }
+
+    const state1 = {
+      ...baseState,
+      turnNum: 1,
+    }
+
+    const whoSignedWhat = [0,1]
+    const preFundSigs = await signStates([state0, state1], wallets, whoSignedWhat)
+
+    const preFundCheckpointTx = await adjudicator.connect(sender).checkpoint(
+      getFixedPart(state1),
+      state1.turnNum,
+      [getVariablePart(state0), getVariablePart(state1)],
+      0,
+      preFundSigs,
+      whoSignedWhat
+    )
+    await preFundCheckpointTx.wait()
+
+    // Run deposits
+    {
+      const depositAmount = ethers.utils.parseEther('10')
+
+      const suggesterDepositTx = await assetHolder.connect(suggester).deposit(
+        '0x0000000000000000000000000000000000000000',
+        channelId,
+        0,
+        depositAmount,
+        {
+          value: depositAmount.toString()
+        }
+      )
+      await suggesterDepositTx.wait()
+
+      const askerDepositTx = await assetHolder.connect(asker).deposit(
+        '0x0000000000000000000000000000000000000000',
+        channelId,
+        depositAmount,
+        depositAmount,
+        {
+          value: depositAmount.toString()
+        }
+      )
+      await askerDepositTx.wait()
+    }
+
+    // Contract is funded, post fund checkpoint
+
+    const state2 = {
+      ...baseState,
+      turnNum: 2,
+    }
+
+    const state3 = {
+      ...baseState,
+      turnNum: 3,
+    }
+
+    const postFundSigs = await signStates([state2, state3], wallets, [0, 1])
+
+    const postFundCheckpointTx = await adjudicator.connect(sender).checkpoint(
+      getFixedPart(state3),
+      state3.turnNum,
+      [getVariablePart(state2), getVariablePart(state3)],
+      0,
+      postFundSigs,
+      [0, 1]
+    )
+    await postFundCheckpointTx.wait()
+
+    const fromAppData = {
+      payment: BigNumber.from(6).toString(),
+      askerBurn: BigNumber.from(3).toString(),
+      suggesterBurn: BigNumber.from(3).toString(),
+      status: AppStatus.Answer,
+      queryStatus: QueryStatus.Accepted,
+      responseStatus: ResponseStatus.None,
+    }
+    const fromAppDataBytes = encodeAppData(fromAppData)
+
+    const state4 = {
+      ...baseState,
+      outcome: createOutcome(
+        { assetHolder },
+        { asker, suggester, beneficiary, },
+        {
+          asker: 7,
+          suggester: 7,
+          beneficiary: 6,
+        }
+      ),
+      appData: fromAppDataBytes,
+      turnNum: 4,
+    }
+
+    const toAppData = {
+      payment: BigNumber.from(6).toString(),
+      askerBurn: BigNumber.from(3).toString(),
+      suggesterBurn: BigNumber.from(3).toString(),
+      status: AppStatus.Validate,
+      queryStatus: QueryStatus.None,
+      responseStatus: ResponseStatus.Pay,
+    }
+    const toAppDataBytes = encodeAppData(toAppData)
+
+    const state5 = {
+      ...baseState,
+      outcome: createOutcome(
+        { assetHolder },
+        { asker, suggester, beneficiary, },
+        {
+          asker: 3,
+          suggester: 16,
+          beneficiary: 0,
+        }
+      ),
+      appData: fromAppDataBytes,
+      turnNum: 5,
+    }
+    const querySigs = await signStates([state4, state5], wallets, [0, 1])
+    const queryCheckpointTx = await adjudicator.connect(sender).checkpoint(
+      getFixedPart(state5),
+      state5.turnNum,
+      [getVariablePart(state4), getVariablePart(state5)],
+      0,
+      querySigs,
+      [0, 1]
+    )
+    await queryCheckpointTx.wait()
   })
 })
