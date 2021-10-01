@@ -1,4 +1,4 @@
-# Scorched
+# Scorched [![build](https://img.shields.io/circleci/build/github/JChanceHud/scorched/main)](https://app.circleci.com/pipelines/github/JChanceHud/scorched)
 
 A 2 of 2 scorched earth implementation.
 
