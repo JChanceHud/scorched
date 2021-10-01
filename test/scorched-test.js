@@ -6,6 +6,7 @@ const {
   getFixedPart,
   getVariablePart,
   signStates,
+  signState,
   convertAddressToBytes32
 } = require('@statechannels/nitro-protocol')
 
@@ -242,5 +243,181 @@ describe('Scorched', function () {
       [0, 1]
     )
     await queryCheckpointTx.wait()
+  })
+
+  it('should run multiple interactions without l1', async () => {
+    const { scorched, adjudicator, assetHolder } = await getDeployedContracts()
+    const [ sender, asker, suggester, beneficiary ] = await ethers.getSigners()
+
+    const depositAmount = ethers.utils.parseEther('100')
+
+    const wallets = [
+      ethers.Wallet.createRandom(),
+      ethers.Wallet.createRandom(),
+    ]
+
+    const channel = {
+      chainId: '0x1234',
+      channelNonce: BigNumber.from(0).toHexString(),
+      participants: wallets.map(w => w.address),
+    }
+    const channelId = getChannelId(channel)
+    const startingOutcome = createOutcome(
+      { assetHolder },
+      { asker, suggester, beneficiary, },
+      {
+        asker: depositAmount.toString(),
+        suggester: depositAmount.toString(),
+        beneficiary: 0,
+      }
+    )
+
+    const baseState = {
+      isFinal: false,
+      channel,
+      outcome: startingOutcome,
+      appDefinition: scorched.address,
+      appData: ethers.constants.HashZero,
+      challengeDuration: 1,
+    }
+
+    const state0 = {
+      ...baseState,
+      turnNum: 0,
+    }
+
+    const state1 = {
+      ...baseState,
+      turnNum: 1,
+    }
+
+    const preFundSigs = await signStates([state0, state1], wallets, [0, 1])
+
+    const preFundCheckpointTx = await adjudicator.connect(sender).checkpoint(
+      getFixedPart(state1),
+      state1.turnNum,
+      [getVariablePart(state0), getVariablePart(state1)],
+      0,
+      preFundSigs,
+      [0, 1]
+    )
+    await preFundCheckpointTx.wait()
+
+    // Run deposits
+    {
+
+      const suggesterDepositTx = await assetHolder.connect(suggester).deposit(
+        '0x0000000000000000000000000000000000000000',
+        channelId,
+        0,
+        depositAmount,
+        {
+          value: depositAmount.toString()
+        }
+      )
+      await suggesterDepositTx.wait()
+
+      const askerDepositTx = await assetHolder.connect(asker).deposit(
+        '0x0000000000000000000000000000000000000000',
+        channelId,
+        depositAmount,
+        depositAmount,
+        {
+          value: depositAmount.toString()
+        }
+      )
+      await askerDepositTx.wait()
+    }
+
+    // Contract is funded, post fund checkpoint
+
+    const state2 = {
+      ...baseState,
+      turnNum: 2,
+    }
+
+    const state3 = {
+      ...baseState,
+      turnNum: 3,
+    }
+
+    const postFundSigs = await signStates([state2, state3], wallets, [0, 1])
+
+    const postFundCheckpointTx = await adjudicator.connect(sender).checkpoint(
+      getFixedPart(state3),
+      state3.turnNum,
+      [getVariablePart(state2), getVariablePart(state3)],
+      0,
+      postFundSigs,
+      [0, 1]
+    )
+    await postFundCheckpointTx.wait()
+
+    const startTurn = 4
+    const balances = {
+      asker: +depositAmount.toString(),
+      suggester: +depositAmount.toString(),
+      beneficiary: 0,
+    }
+    const sigs = []
+    const states = []
+    for (let x = 0; x < 20; x++) {
+      let appData
+      if (x % 2 === 0) {
+        // suggester is responding
+        appData = {
+          payment: BigNumber.from(6).toString(),
+          askerBurn: BigNumber.from(3).toString(),
+          suggesterBurn: BigNumber.from(3).toString(),
+          status: AppStatus.Answer,
+          queryStatus: QueryStatus.Accepted,
+          responseStatus: ResponseStatus.None,
+        }
+        balances.asker -= 3
+        balances.suggester -= 3
+        balances.beneficiary += 6
+      } else {
+        // asker is responding
+        appData = {
+          payment: BigNumber.from(6).toString(),
+          askerBurn: BigNumber.from(3).toString(),
+          suggesterBurn: BigNumber.from(3).toString(),
+          status: AppStatus.Validate,
+          queryStatus: QueryStatus.None,
+          responseStatus: ResponseStatus.Pay,
+        }
+        balances.asker -= 3
+        balances.suggester += 6
+        balances.beneficiary -= 6
+      }
+      const appDataBytes = encodeAppData(appData)
+      const nextState = {
+        ...baseState,
+        outcome: createOutcome(
+          { assetHolder, },
+          { asker, suggester, beneficiary, },
+          balances,
+        ),
+        appData: appDataBytes,
+        turnNum: startTurn + x
+      }
+      const sig = await signState(nextState, wallets[x % 2].privateKey)
+      sigs.push(sig)
+      states.push(nextState)
+    }
+
+    // create a checkpoint after 20 rounds
+    const lastTwoSigs = sigs.slice(-2)
+    const latestState = sigs[sigs.length - 1].state
+    const lastTwoStates = states.slice(-2)
+    const checkpointTx = await adjudicator.connect(sender).checkpoint(
+      getFixedPart(latestState),
+      latestState.turnNum,
+      lastTwoSigs.map(s => getVariablePart(s.state)),
+      0,
+      lastTwoSigs.map((s) => s.signature),
+      [0, 1]
+    )
+    await checkpointTx.wait()
   })
 })
