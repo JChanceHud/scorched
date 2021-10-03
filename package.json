@@ -6,6 +6,7 @@
   "scripts": {
     "hardhat": "hardhat",
     "compile": "hardhat compile && npm run extract-abi",
+    "deploy:goerli": "hardhat run scripts/deploy.js --network goerli",
     "extract-abi": "node scripts/abi",
     "test": "hardhat test"
   },
