@@ -14,8 +14,9 @@ const { AddressZero } = ethers.constants
 const { defaultAbiCoder } = ethers.utils
 
 const AppStatus = {
-  Answer: 0,
-  Validate: 1,
+  Negotiate: 0,
+  Answer: 1,
+  Validate: 2,
 }
 
 const QueryStatus = {
@@ -51,6 +52,8 @@ function createOutcome(contracts, wallets, balances) {
   for (const key of Object.keys(weiBalances)) {
     allocation.push({ destination: key, amount: weiBalances[key] })
   }
+  // console.log(Object.keys(wallets).map(w => `${w}: ${wallets[w].address}`))
+  // console.log(allocation)
   return [
     {
       asset: '0x0000000000000000000000000000000000000000',
@@ -200,9 +203,9 @@ describe('Scorched', function () {
         { assetHolder },
         { asker, suggester, beneficiary, },
         {
-          asker: 7,
+          asker: 4,
           suggester: 7,
-          beneficiary: 6,
+          beneficiary: 9,
         }
       ),
       appData: fromAppDataBytes,
@@ -225,12 +228,12 @@ describe('Scorched', function () {
         { assetHolder },
         { asker, suggester, beneficiary, },
         {
-          asker: 3,
+          asker: 4,
           suggester: 16,
           beneficiary: 0,
         }
       ),
-      appData: fromAppDataBytes,
+      appData: toAppDataBytes,
       turnNum: 5,
     }
     const querySigs = await signStates([state4, state5], wallets, [0, 1])
