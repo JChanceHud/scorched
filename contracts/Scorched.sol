@@ -130,14 +130,6 @@ contract Scorched is IForceMoveApp {
     }
   }
 
-  function requireResponseValid(AppData memory a, AppData memory b) internal pure {
-    // if (fromState.state == AppState.Query) {
-    //   require(b.response == Response.None);
-    // } else if (fromState.state == AppState.Decide) {
-    //   require(b.response == Response.None);
-    // } else if (fromState.state == AppState.)
-  }
-
   function requireAmountsUnchanged(AppData memory a, AppData memory b) internal pure {
     require(a.payment == b.payment, "au0");
     require(a.suggesterBurn == b.suggesterBurn, "au1");
