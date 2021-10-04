@@ -4,9 +4,15 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@statechannels/nitro-protocol/contracts/Outcome.sol";
 import "@statechannels/nitro-protocol/contracts/interfaces/IForceMoveApp.sol";
+import "@statechannels/nitro-protocol/contracts/MultiAssetHolder.sol";
 import "hardhat/console.sol";
 
 contract Scorched is IForceMoveApp {
+  MultiAssetHolder immutable assetHolder;
+
+  constructor(address _assetHolder) {
+    assetHolder = MultiAssetHolder(_assetHolder);
+  }
 
   /**
    * Status flow

@@ -3,20 +3,15 @@ async function main() {
 
   console.log(`Deploying from ${deployer.address}`)
 
-  const Scorched = await ethers.getContractFactory('Scorched')
-  const scorched = await Scorched.deploy()
-  await scorched.deployed()
-
   const NitroAdjudicator = await ethers.getContractFactory('NitroAdjudicator')
   const adjudicator = await NitroAdjudicator.deploy()
   await adjudicator.deployed()
 
-  const AssetHolder = await ethers.getContractFactory('MultiAssetHolder')
-  const assetHolder = await AssetHolder.deploy()
-  await assetHolder.deployed(adjudicator.address)
+  const Scorched = await ethers.getContractFactory('Scorched')
+  const scorched = await Scorched.deploy(adjudicator.address)
+  await scorched.deployed()
 
   console.log(`NitroAdjudicator address: ${adjudicator.address}`)
-  console.log(`MultiAssetHolder address: ${assetHolder.address}`)
   console.log(`Scorched address: ${scorched.address}`)
 }
 

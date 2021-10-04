@@ -41,7 +41,7 @@ function encodeAppData(data) {
 }
 
 function createOutcome(contracts, wallets, balances) {
-  const { assetHolder } = contracts
+  const { adjudicator } = contracts
   const { asker, suggester, beneficiary } = wallets
   const weiBalances = {
     [convertAddressToBytes32(asker.address)]: ethers.utils.parseEther(balances.asker.toString()),
@@ -57,30 +57,27 @@ function createOutcome(contracts, wallets, balances) {
   return [
     {
       asset: '0x0000000000000000000000000000000000000000',
-      assetHolderAddress: assetHolder.address,
+      assetHolderAddress: adjudicator.address,
       allocationItems: allocation
     }
   ]
 }
 
 async function getDeployedContracts() {
-  const Scorched = await ethers.getContractFactory('Scorched')
-  const scorched = await Scorched.deploy()
-  await scorched.deployed()
-
   const NitroAdjudicator = await ethers.getContractFactory('NitroAdjudicator')
   const adjudicator = await NitroAdjudicator.deploy()
   await adjudicator.deployed()
 
-  const AssetHolder = await ethers.getContractFactory('MultiAssetHolder')
-  const assetHolder = await AssetHolder.deploy()
-  await assetHolder.deployed(adjudicator.address)
-  return { scorched, assetHolder, adjudicator }
+  const Scorched = await ethers.getContractFactory('Scorched')
+  const scorched = await Scorched.deploy(adjudicator.address)
+  await scorched.deployed()
+
+  return { scorched, adjudicator }
 }
 
 describe('Scorched', function () {
   it('should query and respond', async () => {
-    const { scorched, adjudicator, assetHolder } = await getDeployedContracts()
+    const { scorched, adjudicator } = await getDeployedContracts()
     const [ sender, asker, suggester, beneficiary ] = await ethers.getSigners()
 
     const wallets = [
@@ -95,7 +92,7 @@ describe('Scorched', function () {
     }
     const channelId = getChannelId(channel)
     const startingOutcome = createOutcome(
-      { assetHolder },
+      { adjudicator },
       { asker, suggester, beneficiary, },
       {
         asker: 10,
@@ -140,7 +137,7 @@ describe('Scorched', function () {
     {
       const depositAmount = ethers.utils.parseEther('10')
 
-      const suggesterDepositTx = await assetHolder.connect(suggester).deposit(
+      const suggesterDepositTx = await adjudicator.connect(suggester).deposit(
         '0x0000000000000000000000000000000000000000',
         channelId,
         0,
@@ -151,7 +148,7 @@ describe('Scorched', function () {
       )
       await suggesterDepositTx.wait()
 
-      const askerDepositTx = await assetHolder.connect(asker).deposit(
+      const askerDepositTx = await adjudicator.connect(asker).deposit(
         '0x0000000000000000000000000000000000000000',
         channelId,
         depositAmount,
@@ -200,7 +197,7 @@ describe('Scorched', function () {
     const state4 = {
       ...baseState,
       outcome: createOutcome(
-        { assetHolder },
+        { adjudicator },
         { asker, suggester, beneficiary, },
         {
           asker: 4,
@@ -225,7 +222,7 @@ describe('Scorched', function () {
     const state5 = {
       ...baseState,
       outcome: createOutcome(
-        { assetHolder },
+        { adjudicator },
         { asker, suggester, beneficiary, },
         {
           asker: 4,
@@ -249,7 +246,7 @@ describe('Scorched', function () {
   })
 
   it('should run multiple interactions without l1', async () => {
-    const { scorched, adjudicator, assetHolder } = await getDeployedContracts()
+    const { scorched, adjudicator } = await getDeployedContracts()
     const [ sender, asker, suggester, beneficiary ] = await ethers.getSigners()
 
     const depositAmount = ethers.utils.parseEther('100')
@@ -266,7 +263,7 @@ describe('Scorched', function () {
     }
     const channelId = getChannelId(channel)
     const startingOutcome = createOutcome(
-      { assetHolder },
+      { adjudicator },
       { asker, suggester, beneficiary, },
       {
         asker: depositAmount.toString(),
@@ -309,7 +306,7 @@ describe('Scorched', function () {
     // Run deposits
     {
 
-      const suggesterDepositTx = await assetHolder.connect(suggester).deposit(
+      const suggesterDepositTx = await adjudicator.connect(suggester).deposit(
         '0x0000000000000000000000000000000000000000',
         channelId,
         0,
@@ -320,7 +317,7 @@ describe('Scorched', function () {
       )
       await suggesterDepositTx.wait()
 
-      const askerDepositTx = await assetHolder.connect(asker).deposit(
+      const askerDepositTx = await adjudicator.connect(asker).deposit(
         '0x0000000000000000000000000000000000000000',
         channelId,
         depositAmount,
@@ -397,7 +394,7 @@ describe('Scorched', function () {
       const nextState = {
         ...baseState,
         outcome: createOutcome(
-          { assetHolder, },
+          { adjudicator, },
           { asker, suggester, beneficiary, },
           balances,
         ),
