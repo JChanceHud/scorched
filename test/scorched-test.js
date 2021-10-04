@@ -7,7 +7,8 @@ const {
   getVariablePart,
   signStates,
   signState,
-  convertAddressToBytes32
+  convertAddressToBytes32,
+  Transactions,
 } = require('@statechannels/nitro-protocol')
 
 const { AddressZero } = ethers.constants
@@ -607,7 +608,7 @@ describe('Scorched', function () {
       state6.turnNum,
       [getVariablePart(sig2.state), getVariablePart(acceptSig.state)],
       0,
-      [sig2.signature, acceptSig.signature],
+      [acceptSig.signature, sig2.signature],
       [1, 0],
     )
     await acceptTx.wait()
