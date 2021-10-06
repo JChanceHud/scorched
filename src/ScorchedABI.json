@@ -2,6 +2,30 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_assetHolder",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "assetHolder",
+    "outputs": [
+      {
+        "internalType": "contract MultiAssetHolder",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "components": [
           {
             "internalType": "bytes",

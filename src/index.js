@@ -1,2 +1,3 @@
 const ScorchedABI = require('./ScorchedABI.json')
-module.exports = { ScorchedABI }
+const AdjudicatorABI = require('./AdjudicatorABI.json')
+module.exports = { ScorchedABI, AdjudicatorABI, }
