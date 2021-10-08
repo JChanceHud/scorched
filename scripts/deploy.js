@@ -11,8 +11,13 @@ async function main() {
   const scorched = await Scorched.deploy(adjudicator.address)
   await scorched.deployed()
 
+  const ScorchedMarket = await ethers.getContractFactory('ScorchedMarket')
+  const scorchedMarket = await ScorchedMarket.deploy()
+  await scorchedMarket.deployed()
+
   console.log(`NitroAdjudicator address: ${adjudicator.address}`)
   console.log(`Scorched address: ${scorched.address}`)
+  console.log(`ScorchedMarket address: ${scorchedMarket.address}`)
 }
 
 main()

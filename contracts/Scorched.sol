@@ -8,19 +8,11 @@ import "@statechannels/nitro-protocol/contracts/MultiAssetHolder.sol";
 import "hardhat/console.sol";
 
 contract Scorched is IForceMoveApp {
-  MultiAssetHolder immutable assetHolder;
+  MultiAssetHolder immutable public assetHolder;
 
   constructor(address _assetHolder) {
     assetHolder = MultiAssetHolder(_assetHolder);
   }
-
-  /**
-   * Status flow
-   *
-   * Start at Query
-   * Query -> Answer -> Validate
-   * From Validate an Asker may move state to Answer (by posing a new query)
-   **/
 
   enum AppStatus {
     Negotiate,
