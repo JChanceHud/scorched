@@ -39,7 +39,7 @@ function decodeAppData(data) {
   )
 }
 
-function createOutcome(balances) {
+function createOutcome(balances, assetHolderAddress) {
   const keyedBalances = {}
   for (const address of Object.keys(balances)) {
     keyedBalances[ethers.utils.hexZeroPad(address, 32)] = balances[address]
@@ -54,7 +54,7 @@ function createOutcome(balances) {
   return [
     {
       asset: ethers.constants.AddressZero,
-      assetHolderAddress: ASSET_HOLDER_ADDRESS,
+      assetHolderAddress,
       allocationItems: allocation,
     }
   ]
@@ -69,4 +69,5 @@ module.exports = {
   ResponseStatus,
   encodeAppData,
   decodeAppData,
+  createOutcome,
 }
