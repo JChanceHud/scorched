@@ -39,6 +39,19 @@ function decodeAppData(data) {
   )
 }
 
+// A helper to provide a keyed object instead of an array
+function parseAppData(data) {
+  const [[
+    payment,
+    suggesterBurn,
+    askerBurn,
+    status,
+    queryStatus,
+    responseStatus
+  ]] = decodeAppData(data)
+  return { payment, suggesterBurn, askerBurn, status, queryStatus, responseStatus }
+}
+
 function createOutcome(balances, assetHolderAddress) {
   const keyedBalances = {}
   for (const address of Object.keys(balances)) {
@@ -70,4 +83,5 @@ module.exports = {
   encodeAppData,
   decodeAppData,
   createOutcome,
+  parseAppData,
 }
