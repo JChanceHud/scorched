@@ -1,6 +1,6 @@
 {
   "name": "scorched",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A 2 of 2 scorched earth implementation",
   "main": "./src/index.js",
   "types": "./index.d.ts",
